@@ -28,6 +28,7 @@ along with microdnf.  If not, see <https://www.gnu.org/licenses/>.
 #include <libdnf/utils/span.hpp>
 
 #include <memory>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -99,6 +100,12 @@ libdnf::transaction::TransactionWeakPtr new_db_transaction(Context & ctx);
 /// Fills transactions by packages from goal.
 // TODO(jrohel): Temporary code. Will be rewritten (depends on software database code) and moved to libdnf::cli later.
 void fill_transactions(libdnf::Goal & goal, libdnf::transaction::TransactionWeakPtr & transaction, libdnf::rpm::Transaction & rpm_ts, std::vector<std::unique_ptr<RpmTransactionItem>> & transaction_items);
+
+std::vector<libdnf::rpm::Package> add_remote_packages(Context & ctx, const std::set<std::string> & paths, bool strict);
+
+enum class KeyType {SPEC, PACKAGE_FILE, GROUP};
+
+KeyType get_key_type(const std::string & value);
 
 }  // namespace microdnf
 

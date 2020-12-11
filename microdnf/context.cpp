@@ -20,6 +20,8 @@ along with microdnf.  If not, see <https://www.gnu.org/licenses/>.
 #include "context.hpp"
 #include "utils.hpp"
 
+#include "libdnf/utils/string.hpp"
+
 #include <libdnf-cli/progressbar/multi_progress_bar.hpp>
 #include <libdnf-cli/utils/tty.hpp>
 #include <libdnf/base/goal.hpp>
@@ -443,6 +445,16 @@ void download_packages(libdnf::Goal & goal, const char * dest_dir) {
     download_pkgs.insert(download_pkgs.end(), reinstalls_pkgs.begin(), reinstalls_pkgs.end());
     download_pkgs.insert(download_pkgs.end(), upgrades_pkgs.begin(), upgrades_pkgs.end());
     download_pkgs.insert(download_pkgs.end(), downgrades_pkgs.begin(), downgrades_pkgs.end());
+
+    // Packages in @commandline repository are removed from download.
+    for (auto it = download_pkgs.begin(); it != download_pkgs.end(); ) {
+        if (it->get_repo()->get_id() == "@commandline") {
+            download_pkgs.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
     download_packages(download_pkgs, dest_dir);
 }
 
@@ -748,6 +760,35 @@ void fill_transactions(libdnf::Goal & goal, libdnf::transaction::TransactionWeak
         auto & trans_pkg = transaction->new_package();
         set_trans_pkg(package, trans_pkg, libdnf::transaction::TransactionItemAction::DOWNGRADE);
         rpm_ts.upgrade(*item_ptr);
+    }
+}
+
+std::vector<libdnf::rpm::Package> add_remote_packages(Context & ctx, const std::set<std::string> & paths, bool strict) {
+    auto & solv_sack = ctx.base.get_rpm_solv_sack();
+    std::vector<libdnf::rpm::Package> remote_packages;
+    for (auto & path : paths) {
+        try {
+            remote_packages.push_back(solv_sack.add_cmdline_package(path, false));
+        } catch (const libdnf::RuntimeError & ex) {
+            if (strict) {
+                std::cerr << ex.what() << std::endl;
+                throw;
+            }
+        }
+    }
+    return remote_packages;
+}
+
+KeyType get_key_type(const std::string & value) {
+    auto & starts_with = libdnf::utils::string::starts_with;
+    auto & ends_with = libdnf::utils::string::ends_with;
+    if (ends_with(value, ".rpm") || starts_with(value, "file:/") || starts_with(value, "http:/")
+        || starts_with(value, "https:/") || starts_with(value, "ftp:/")) {
+        return KeyType::PACKAGE_FILE;
+    } else if (value[0] == '@') {
+        return KeyType::GROUP;
+    } else {
+        return KeyType::SPEC;
     }
 }
 
