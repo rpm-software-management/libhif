@@ -471,6 +471,7 @@ public:
             ignore_set |= RPMPROB_FILTER_OLDPACKAGE;
         }
         if (cb_info.cb) {
+            rpmtsSetNotifyStyle(ts, 1);
             rpmtsSetNotifyCallback(ts, ts_callback, &cb_info);
         }
         auto rc = rpmtsRun(ts, nullptr, ignore_set);
@@ -533,7 +534,7 @@ private:
     /// @param key  result of rpmteKey() of related rpmte or 0
     /// @param data  user data as passed to rpmtsSetNotifyCallback()
     static void * ts_callback(
-        const void * hd,
+        const void * te,
         const rpmCallbackType what,
         const rpm_loff_t amount,
         const rpm_loff_t total,
@@ -544,7 +545,8 @@ private:
         auto * transaction = cb_info->transaction;
         auto & log = *transaction->base->get_logger();
         auto & cb = *cb_info->cb;
-        auto * hdr = const_cast<headerToken_s *>(static_cast<const headerToken_s *>(hd));
+        auto * trans_element = static_cast<rpmte>(const_cast<void *>(te));
+        auto * hdr = trans_element ? rpmteHeader(trans_element) : nullptr;
         const auto * item = static_cast<const TransactionItem *>(pkg_key);
         if (!item && hdr) {
             auto iter = transaction->items.find(headerGetInstance(hdr));
