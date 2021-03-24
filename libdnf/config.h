@@ -18,12 +18,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <bits/wordsize.h>
+#include <limits.h>
 
-#if __WORDSIZE == 32
-#include "config-32.h"
-#elif __WORDSIZE == 64
+#if (ULONG_MAX == 0xffffffffffffffff)
 #include "config-64.h"
 #else
-#error "Unknown word size"
+#include "config-32.h"
 #endif
