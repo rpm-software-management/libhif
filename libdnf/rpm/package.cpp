@@ -102,6 +102,10 @@ std::string Package::get_full_nevra() const {
     return cstring2string(solv::get_full_nevra(pool, id.id));
 }
 
+std::string Package::get_na() const {
+    return get_name() + "." + get_arch();
+}
+
 std::string Package::get_group() const {
     Pool * pool = sack->p_impl->pool;
     return cstring2string(solv::get_group(pool, id.id));
