@@ -298,7 +298,8 @@ class ConfigMain::Impl {
     OptionBool fastestmirror{false};
     OptionStringList excludepkgs{std::vector<std::string>{}};
     OptionStringList includepkgs{std::vector<std::string>{}};
-    OptionStringList weakexcludes{std::vector<std::string>{}};
+    OptionStringList weak_excludes{std::vector<std::string>{}};
+    OptionBool weak_exclude_unmet_weak_deps{true};
     OptionString proxy{""};
     OptionString proxy_username{nullptr};
     OptionString proxy_password{nullptr};
@@ -476,12 +477,13 @@ ConfigMain::Impl::Impl(Config & owner)
             optionTListAppend(includepkgs, priority, value);
         }, nullptr, true
     );
-    owner.optBinds().add("weakexcludes", weakexcludes,
+    owner.optBinds().add("weak_excludes", weak_excludes,
         [&](Option::Priority priority, const std::string & value){
-            optionTListAppend(weakexcludes, priority, value);
+            optionTListAppend(weak_excludes, priority, value);
         }, nullptr, true
     );
 
+    owner.optBinds().add("weak_exclude_unmet_weak_deps", weak_exclude_unmet_weak_deps);
     owner.optBinds().add("proxy", proxy);
     owner.optBinds().add("proxy_username", proxy_username);
     owner.optBinds().add("proxy_password", proxy_password);
@@ -607,7 +609,8 @@ OptionString & ConfigMain::cachedir() { return pImpl->cachedir; }
 OptionBool & ConfigMain::fastestmirror() { return pImpl->fastestmirror; }
 OptionStringList & ConfigMain::excludepkgs() { return pImpl->excludepkgs; }
 OptionStringList & ConfigMain::includepkgs() { return pImpl->includepkgs; }
-OptionStringList & ConfigMain::weakexcludes() { return pImpl->weakexcludes; }
+OptionStringList & ConfigMain::weak_excludes() { return pImpl->weak_excludes; }
+OptionBool & ConfigMain::weak_exclude_unmet_weak_deps() { return pImpl->weak_exclude_unmet_weak_deps; }
 OptionString & ConfigMain::proxy() { return pImpl->proxy; }
 OptionString & ConfigMain::proxy_username() { return pImpl->proxy_username; }
 OptionString & ConfigMain::proxy_password() { return pImpl->proxy_password; }
