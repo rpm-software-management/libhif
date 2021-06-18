@@ -30,16 +30,11 @@ along with libdnf.  If not, see <https://www.gnu.org/licenses/>.
 
 
 namespace libdnf::solv {
-
 class SolvMap;
-
 }  // namespace libdnf::rpm::solv
 
-namespace libdnf::rpm {
 
-class PackageSetIterator;
-class PackageQuery;
-class Transaction;
+namespace libdnf::rpm {
 
 
 /// @replaces libdnf:sack/packageset.hpp:struct:PackageSet
@@ -104,11 +99,11 @@ public:
     void swap(PackageSet & other) noexcept;
 
 private:
-    friend PackageSetIterator;
-    friend PackageQuery;
-    friend Transaction;
-    friend libdnf::Goal;
-    friend libdnf::Swdb;
+    friend class PackageSetIterator;
+    friend class PackageQuery;
+    friend class Transaction;
+    friend class libdnf::Goal;
+    friend class libdnf::Swdb;
     PackageSet(const PackageSackWeakPtr & sack, libdnf::solv::SolvMap & solv_map);
     class Impl;
     std::unique_ptr<Impl> p_impl;
