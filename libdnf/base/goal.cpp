@@ -393,7 +393,7 @@ GoalProblem Goal::Impl::add_install_to_goal(const std::string & spec, GoalJobSet
 
     if (multilib_policy == "all" || utils::is_glob_pattern(nevra_pair.second.get_arch().c_str())) {
         if (!settings.to_repo_ids.empty()) {
-            query.filter_repoid(settings.to_repo_ids, sack::QueryCmp::GLOB);
+            query.filter_repo_id(settings.to_repo_ids, sack::QueryCmp::GLOB);
             if (query.empty()) {
                 add_rpm_goal_report(
                     Goal::Action::INSTALL, GoalProblem::NOT_FOUND_IN_REPOSITORIES, settings, spec, {}, strict);
@@ -470,7 +470,7 @@ GoalProblem Goal::Impl::add_install_to_goal(const std::string & spec, GoalJobSet
              (!nevra_pair.second.get_epoch().empty() || !nevra_pair.second.get_version().empty() ||
               !nevra_pair.second.get_release().empty() || !nevra_pair.second.get_arch().empty()))) {
             if (!settings.to_repo_ids.empty()) {
-                query.filter_repoid(settings.to_repo_ids, sack::QueryCmp::GLOB);
+                query.filter_repo_id(settings.to_repo_ids, sack::QueryCmp::GLOB);
                 if (query.empty()) {
                     add_rpm_goal_report(
                         Goal::Action::INSTALL, GoalProblem::NOT_FOUND_IN_REPOSITORIES, settings, spec, {}, strict);
@@ -534,7 +534,7 @@ GoalProblem Goal::Impl::add_install_to_goal(const std::string & spec, GoalJobSet
                 add_obsoletes_to_data(base_query, query);
             }
             if (!settings.to_repo_ids.empty()) {
-                query.filter_repoid(settings.to_repo_ids, sack::QueryCmp::GLOB);
+                query.filter_repo_id(settings.to_repo_ids, sack::QueryCmp::GLOB);
                 if (query.empty()) {
                     add_rpm_goal_report(
                         Goal::Action::INSTALL, GoalProblem::NOT_FOUND_IN_REPOSITORIES, settings, spec, {}, strict);
@@ -608,7 +608,7 @@ GoalProblem Goal::Impl::add_reinstall_to_goal(const std::string & spec, GoalJobS
     // TODO(jmracek) Implement fitering from_repo_ids
 
     if (!settings.to_repo_ids.empty()) {
-        relevant_available.filter_repoid(settings.to_repo_ids, sack::QueryCmp::GLOB);
+        relevant_available.filter_repo_id(settings.to_repo_ids, sack::QueryCmp::GLOB);
         if (relevant_available.empty()) {
             add_rpm_goal_report(
                 Goal::Action::REINSTALL, GoalProblem::NOT_FOUND_IN_REPOSITORIES, settings, spec, {}, strict);
@@ -691,7 +691,7 @@ GoalProblem Goal::Impl::report_not_found(
         }
         return GoalProblem::NOT_FOUND;
     }
-    query.filter_repoid({"src", "nosrc"}, sack::QueryCmp::NEQ);
+    query.filter_repo_id({"src", "nosrc"}, sack::QueryCmp::NEQ);
     if (query.empty()) {
         add_rpm_goal_report(action, GoalProblem::ONLY_SRC, settings, pkg_spec, {}, strict);
         return GoalProblem::ONLY_SRC;
@@ -866,7 +866,7 @@ void Goal::Impl::add_up_down_distrosync_to_goal(Action action, const std::string
         }
     }
     if (!settings.to_repo_ids.empty()) {
-        query.filter_repoid(settings.to_repo_ids, sack::QueryCmp::GLOB);
+        query.filter_repo_id(settings.to_repo_ids, sack::QueryCmp::GLOB);
         if (query.empty()) {
             add_rpm_goal_report(action, GoalProblem::NOT_FOUND_IN_REPOSITORIES, settings, spec, {}, false);
             return;
