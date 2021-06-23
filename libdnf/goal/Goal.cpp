@@ -635,7 +635,7 @@ erase_flags2libsolv(int flags)
 Goal::Goal(const Goal & goal_src) : pImpl(new Impl(*goal_src.pImpl)) {}
 
 Goal::Impl::Impl(const Goal::Impl & goal_src)
-: sack(goal_src.sack)
+: sack(goal_src.sack), weak_excludes(goal_src.weak_excludes)
 {
     queue_init_clone(&staging, const_cast<Queue *>(&goal_src.staging));
 
@@ -649,7 +649,7 @@ Goal::Impl::Impl(const Goal::Impl & goal_src)
 }
 
 Goal::Impl::Impl(DnfSack *sack)
-: sack(sack)
+: sack(sack), weak_excludes(sack)
 {
     queue_init(&staging);
 }
@@ -791,6 +791,18 @@ void
 Goal::favor(DnfPackage *pkg)
 {
     queue_push2(&pImpl->staging, SOLVER_SOLVABLE|SOLVER_FAVOR, dnf_package_get_id(pkg));
+}
+
+void
+Goal::add_weak_exclude(const DnfPackageSet & pset)
+{
+    pImpl->weak_excludes += pset;
+}
+
+void
+Goal::reset_weak_exclude()
+{
+    pImpl->weak_excludes.clear();
 }
 
 void
@@ -1259,6 +1271,12 @@ Goal::Impl::constructJob(DnfGoalActions flags)
     if (flags & DNF_FORCE_BEST)
         for (int i = 0; i < job->size(); i += 2) {
             elements[i] |= SOLVER_FORCEBEST;
+    }
+
+    // Add weak excludes to the job
+    Id id = -1;
+    while ((id = weak_excludes.next(id)) != -1) {
+        job->pushBack(SOLVER_SOLVABLE|SOLVER_WEAK_EXCLUDE, id);
     }
 
     /* turn off implicit obsoletes for installonly packages */

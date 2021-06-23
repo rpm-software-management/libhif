@@ -76,6 +76,8 @@ public:
     void install(DnfPackage *new_pkg, bool optional);
     void lock(DnfPackage *new_pkg);
     void favor(DnfPackage *new_pkg);
+    void add_weak_exclude(const DnfPackageSet & pset);
+    void reset_weak_exclude();
     void disfavor(DnfPackage *new_pkg);
 
     /**
