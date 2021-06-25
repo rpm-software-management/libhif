@@ -77,7 +77,9 @@ public:
     void lock(DnfPackage *new_pkg);
     void favor(DnfPackage *new_pkg);
     void add_weak_exclude(const DnfPackageSet & pset);
+    void add_weak_exclude(DnfPackage *pkg);
     void reset_weak_exclude();
+    void weak_exclude_unmet_weak_deps();
     void disfavor(DnfPackage *new_pkg);
 
     /**
