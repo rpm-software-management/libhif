@@ -3525,7 +3525,15 @@ dnf_context_module_install(DnfContext * context, const char ** module_specs, GEr
                             throw std::runtime_error(tfm::format(_("No profile found matching '%s'"), nsvcap_obj->getProfile().c_str()));
                         }
                     } else {
-                        profiles.push_back(latest->getDefaultProfile());
+                        // This queries the distro-level modulemd-defaults.
+                        auto default_profiles = container->getDefaultProfiles(latest->getName(), latest->getStream());
+                        for (auto & profileName : default_profiles) {
+                            auto matching = latest->getProfiles(profileName);
+                            profiles.insert(profiles.begin(), matching.begin(), matching.end());
+                        }
+                        if (profiles.empty()) {
+                            throw std::runtime_error("No default profile found for " + latest->getFullIdentifier());
+                        }
                     }
 
                     g_autoptr(GPtrArray) pkgnames = g_ptr_array_new_with_free_func (g_free);
