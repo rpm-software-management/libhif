@@ -635,7 +635,7 @@ erase_flags2libsolv(int flags)
 Goal::Goal(const Goal & goal_src) : pImpl(new Impl(*goal_src.pImpl)) {}
 
 Goal::Impl::Impl(const Goal::Impl & goal_src)
-: sack(goal_src.sack)
+: sack(goal_src.sack), weak_excludes(goal_src.weak_excludes)
 {
     queue_init_clone(&staging, const_cast<Queue *>(&goal_src.staging));
 
@@ -649,7 +649,7 @@ Goal::Impl::Impl(const Goal::Impl & goal_src)
 }
 
 Goal::Impl::Impl(DnfSack *sack)
-: sack(sack)
+: sack(sack), weak_excludes(sack)
 {
     queue_init(&staging);
 }
@@ -791,6 +791,92 @@ void
 Goal::favor(DnfPackage *pkg)
 {
     queue_push2(&pImpl->staging, SOLVER_SOLVABLE|SOLVER_FAVOR, dnf_package_get_id(pkg));
+}
+
+void
+Goal::add_weak_exclude(const DnfPackageSet & pset)
+{
+    pImpl->weak_excludes += pset;
+}
+
+void
+Goal::add_weak_exclude(DnfPackage *pkg)
+{
+    // ensure that the map has a corrent size before set to prevent memory corruption
+    map_grow(pImpl->weak_excludes.getMap(), dnf_sack_get_pool(pImpl->sack)->nsolvables);
+    pImpl->weak_excludes.set(pkg);
+}
+
+void
+Goal::reset_weak_exclude()
+{
+    pImpl->weak_excludes.clear();
+}
+
+void
+Goal::weak_exclude_unmet_weak_deps()
+{
+    Query installed_query(pImpl->sack, Query::ExcludeFlags::IGNORE_EXCLUDES);
+    installed_query.installed();
+    if (installed_query.empty()) {
+        return;
+    }
+    Query base_query(pImpl->sack);
+    base_query.apply();
+    auto * installed_pset = installed_query.getResultPset();
+    Id installed_id = -1;
+
+    std::vector<const char *> installed_names;
+    installed_names.reserve(installed_pset->size());
+
+    // Iterate over installed packages to detect unmet weak deps
+    while ((installed_id = installed_pset->next(installed_id)) != -1) {
+        g_autoptr(DnfPackage) pkg = dnf_package_new(pImpl->sack, installed_id);
+        installed_names.push_back(dnf_package_get_name(pkg));
+        std::unique_ptr<libdnf::DependencyContainer> recommends(dnf_package_get_recommends(pkg));
+        for (int i = 0; i < recommends->count(); ++i) {
+            Query query(base_query);
+            std::unique_ptr<libdnf::Dependency> dep(recommends->getPtr(i));
+            const char * version = dep->getVersion();
+            //  There can be installed provider in different version or upgraded packed can recommend a different version
+            //  Ignore version and search only by reldep name
+            if (version && strlen(version) > 0) {
+                query.addFilter(HY_PKG_PROVIDES, HY_EQ, dep->getName());
+            } else {
+                query.addFilter(HY_PKG_PROVIDES, dep.get());
+            }
+            // No providers of recommend => continue
+            if (query.empty()) {
+                continue;
+            }
+            Query test_installed(query);
+            test_installed.installed();
+            // when there is not installed any provider of recommend, exclude it
+            if (test_installed.empty()) {
+                add_weak_exclude(*query.getResultPset());
+            }
+        }
+    }
+
+    // Invesigate supplements of only available packages with a different name to installed packages
+    installed_names.push_back(nullptr);
+    base_query.addFilter(HY_PKG_NAME, HY_NEQ, installed_names.data());
+    auto * available_pset = base_query.getResultPset();
+    *available_pset -= *installed_pset;
+    Id available_id = -1;
+    while ((available_id = available_pset->next(available_id)) != -1) {
+        g_autoptr(DnfPackage) pkg = dnf_package_new(pImpl->sack, available_id);
+        std::unique_ptr<libdnf::DependencyContainer> supplements(dnf_package_get_supplements(pkg));
+        if (supplements->count() == 0) {
+            continue;
+        }
+        Query query(installed_query);
+        query.addFilter(HY_PKG_PROVIDES, supplements.get());
+        // When supplemented package already installed, weak_exclude available package
+        if (!query.empty()) {
+            add_weak_exclude(pkg);
+        }
+    }
 }
 
 void
@@ -1259,6 +1345,12 @@ Goal::Impl::constructJob(DnfGoalActions flags)
     if (flags & DNF_FORCE_BEST)
         for (int i = 0; i < job->size(); i += 2) {
             elements[i] |= SOLVER_FORCEBEST;
+    }
+
+    // Add weak excludes to the job
+    Id id = -1;
+    while ((id = weak_excludes.next(id)) != -1) {
+        job->pushBack(SOLVER_SOLVABLE|SOLVER_WEAK_EXCLUDE, id);
     }
 
     /* turn off implicit obsoletes for installonly packages */
