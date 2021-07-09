@@ -45,6 +45,33 @@ along with libdnf.  If not, see <https://www.gnu.org/licenses/>.
 
 namespace libdnf::rpm {
 
+RpmHeader::RpmHeader(void * hdr) : header(headerLink(static_cast<Header>(hdr))) {}
+
+RpmHeader::RpmHeader(const RpmHeader & src) : header(headerLink(static_cast<Header>(src.header))) {}
+
+RpmHeader::RpmHeader(RpmHeader && src) : header(src.header) {
+    src.header = nullptr;
+}
+
+RpmHeader::~RpmHeader() {
+    headerFree(static_cast<Header>(header));
+}
+
+RpmHeader & RpmHeader::operator=(const RpmHeader & src) {
+    if (&src != this) {
+        header = headerLink(static_cast<Header>(src.header));
+    }
+    return *this;
+}
+
+RpmHeader & RpmHeader::operator=(RpmHeader && src) {
+    if (&src != this) {
+        header = src.header;
+        src.header = nullptr;
+    }
+    return *this;
+}
+
 std::string RpmHeader::get_name() const {
     return headerGetString(static_cast<Header>(header), RPMTAG_NAME);
 }
