@@ -403,6 +403,7 @@ public:
         auto file_path = item.get_pkg().get_package_path();
         auto * header = read_pkg_header(file_path);
         auto rc = rpmtsAddReinstallElement(ts, header, &item);
+        headerFree(header);
         if (rc != 0) {
             std::string msg = "Can't reinstall package \"" + file_path + "\"";
             throw Exception(msg);
@@ -563,7 +564,7 @@ private:
             case RPMCALLBACK_INST_OPEN_FILE: {
                 auto file_path = item->get_pkg().get_package_path();
                 if (file_path.empty()) {
-                    return nullptr;
+                    break;
                 }
                 transaction->fd_in_cb = Fopen(file_path.c_str(), "r.ufdio");
                 rc = transaction->fd_in_cb;
@@ -655,6 +656,8 @@ private:
                 log.warning("Unknown RPM Transaction callback type: RPMCALLBACK_UNKNOWN");
         }
 
+        headerFree(hdr);
+
         return rc;
     }
 };
@@ -697,6 +700,7 @@ void Transaction::Impl::install_up_down(TransactionItem & item, libdnf::transact
     auto file_path = item.get_pkg().get_package_path();
     auto * header = read_pkg_header(file_path);
     auto rc = rpmtsAddInstallElement(ts, header, &item, upgrade ? 1 : 0, nullptr);
+    headerFree(header);
     if (rc != 0) {
         std::string msg = "Can't " + msg_action + " package \"" + file_path + "\"";
         throw Exception(msg);
