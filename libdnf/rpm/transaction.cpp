@@ -45,6 +45,33 @@ along with libdnf.  If not, see <https://www.gnu.org/licenses/>.
 
 namespace libdnf::rpm {
 
+RpmHeader::RpmHeader(void * hdr) : header(headerLink(static_cast<Header>(hdr))) {}
+
+RpmHeader::RpmHeader(const RpmHeader & src) : header(headerLink(static_cast<Header>(src.header))) {}
+
+RpmHeader::RpmHeader(RpmHeader && src) : header(src.header) {
+    src.header = nullptr;
+}
+
+RpmHeader::~RpmHeader() {
+    headerFree(static_cast<Header>(header));
+}
+
+RpmHeader & RpmHeader::operator=(const RpmHeader & src) {
+    if (&src != this) {
+        header = headerLink(static_cast<Header>(src.header));
+    }
+    return *this;
+}
+
+RpmHeader & RpmHeader::operator=(RpmHeader && src) {
+    if (&src != this) {
+        header = src.header;
+        src.header = nullptr;
+    }
+    return *this;
+}
+
 std::string RpmHeader::get_name() const {
     return headerGetString(static_cast<Header>(header), RPMTAG_NAME);
 }
@@ -375,9 +402,17 @@ public:
     void reinstall(TransactionItem & item) {
         auto file_path = item.get_pkg().get_package_path();
         auto * header = read_pkg_header(file_path);
+        last_added_item = &item;
+        last_item_is_reinstall = true;
+        last_item_added_ts_element = false;
         auto rc = rpmtsAddReinstallElement(ts, header, &item);
+        headerFree(header);
         if (rc != 0) {
             std::string msg = "Can't reinstall package \"" + file_path + "\"";
+            throw Exception(msg);
+        }
+        if (!last_item_added_ts_element) {
+            std::string msg = "librpm ignores explicit request to reinstall package \"" + file_path + "\"";
             throw Exception(msg);
         }
     }
@@ -388,16 +423,25 @@ public:
         auto rpmdb_id = static_cast<unsigned int>(item.get_pkg().get_rpmdbid());
         auto * header = get_header(rpmdb_id);
         int unused = -1;
+        last_added_item = &item;
+        last_item_is_reinstall = false;
+        last_item_added_ts_element = false;
         int rc = rpmtsAddEraseElement(ts, header, unused);
         headerFree(header);
         if (rc != 0) {
             throw Exception("Can't remove package");
         }
-        auto [iter, inserted] = items.insert({rpmdb_id, &item});
-        if (!inserted) {
-            throw Exception("The package already added to be erased in rpm::Transaction");
+        if (!last_item_added_ts_element) {
+            auto it = implicit_ts_elements.find(rpmdb_id);
+            if (it == implicit_ts_elements.end()) {
+                std::string msg = "librpm ignores explicit request to remove package \"" + item.get_pkg().get_full_nevra() + "\"";
+                throw Exception(msg);
+            }
+            auto * te = it->second;
+            rpmteSetUserdata(te, &item);
+            implicit_ts_elements.erase(it);
         }
-    };
+    }
 
     // Set transaction notify callback.
     void register_cb(TransactionCB * cb) { cb_info.cb = cb; }
@@ -443,6 +487,7 @@ public:
             ignore_set |= RPMPROB_FILTER_OLDPACKAGE;
         }
         if (cb_info.cb) {
+            rpmtsSetNotifyStyle(ts, 1);
             rpmtsSetNotifyCallback(ts, ts_callback, &cb_info);
         }
         auto rc = rpmtsRun(ts, nullptr, ignore_set);
@@ -484,7 +529,12 @@ private:
     FD_t script_fd{nullptr};
     CallbackInfo cb_info{nullptr, this};
     FD_t fd_in_cb{nullptr};  // file descriptor used by transaction in callback (install/reinstall package)
-    std::map<unsigned int, TransactionItem *> items{};
+
+    TransactionItem * last_added_item{nullptr}; // item added by last install/reinstall/erase/...
+    bool last_item_is_reinstall{false};  // Is the last added item type reinstall?
+    bool last_item_added_ts_element{false}; // Did the last item add the element ts?
+
+    std::map<unsigned int, rpmte> implicit_ts_elements;  // elements added to the librpm transaction by librpm itself
     bool downgrade_requested{false};
 
     /// Add package to be installed to transaction set.
@@ -494,6 +544,69 @@ private:
     /// @param action  one of TransactionItemAction::UPGRADE,
     ///     TransactionItemAction::DOWNGRADE, TransactionItemAction::INSTALL
     void install_up_down(TransactionItem & item, libdnf::transaction::TransactionItemAction action);
+
+    /// Function triggered by rpmtsNotifyChange()
+    ///
+    /// On explicit install/erase add events, "other" is NULL, on implicit
+    /// add events (erasures due to obsolete/upgrade/reinstall, replaced by newer)
+    /// it points to the replacing package.
+    ///
+    /// @param event  Change event (see rpmtsEvent enum)
+    /// @param te  Transaction element
+    /// @param other  Related transaction element (or NULL)
+    /// @param data  Application private data from rpmtsSetChangeCallback()
+    static int ts_change_callback(int event, rpmte te, rpmte other, void * data)
+    {
+        auto * transaction = static_cast<Impl *>(data);
+
+        if (!other) {
+            // explicit action caused by last_added_item
+            rpmteSetUserdata(te, transaction->last_added_item);
+            transaction->last_item_added_ts_element = true;
+        } else {
+            // action caused by librpm itself
+            auto trigger_nevra = transaction->last_added_item->get_pkg().get_full_nevra();
+            auto te_rpmdb_record_number = rpmteDBOffset(te);
+            auto te_nevra = fmt::format("{}-{}:{}-{}.{}", rpmteN(te), rpmteE(te) ? rpmteE(te) : "0", rpmteV(te), rpmteR(te), rpmteA(te));
+            auto & log = *transaction->base->get_logger();
+            const char * te_type;
+            switch (rpmteType(te)) {
+                case TR_ADDED:
+                    te_type = "install package";
+                    break;
+                case TR_REMOVED:
+                    te_type = "remove package";
+                    break;
+                case TR_RPMDB:
+                    te_type = "package from_rpmdb";
+                    break;
+            }
+            if (te_rpmdb_record_number == 0) {
+                auto msg = fmt::format("Implicit element {} type {} with zero record number (caused by {})", te_nevra, te_type, trigger_nevra);
+                log.error(msg);
+                throw LogicError(msg);
+            }
+            switch (event) {
+                case RPMTS_EVENT_ADD: {
+                    if (transaction->last_item_is_reinstall && trigger_nevra == te_nevra) {
+                        // reinstall: two transaction elements for the same request (last_added_item) - install and remove
+                        rpmteSetUserdata(te, transaction->last_added_item);
+                    } else {
+                        transaction->implicit_ts_elements.insert({te_rpmdb_record_number, te});
+                    }
+                    auto msg = fmt::format("Implicitly added element {} type {} (caused by {})", te_nevra, te_type, trigger_nevra);
+                    log.debug(msg);
+                    break;
+                }
+                case RPMTS_EVENT_DEL: {
+                    auto msg = fmt::format("Implicitly removed element {} type {} (caused by {})", te_nevra, te_type, trigger_nevra);
+                    log.error(msg);
+                    throw LogicError(msg);
+                }
+            }
+        }
+        return 0;
+    }
 
     /// Function triggered by rpmtsNotify()
     ///
@@ -505,25 +618,22 @@ private:
     /// @param key  result of rpmteKey() of related rpmte or 0
     /// @param data  user data as passed to rpmtsSetNotifyCallback()
     static void * ts_callback(
-        const void * hd,
+        const void * te,
         const rpmCallbackType what,
         const rpm_loff_t amount,
         const rpm_loff_t total,
-        const void * pkg_key,
+        [[maybe_unused]] const void * pkg_key,
         rpmCallbackData data) {
         void * rc = nullptr;
         auto * cb_info = static_cast<CallbackInfo *>(data);
         auto * transaction = cb_info->transaction;
         auto & log = *transaction->base->get_logger();
         auto & cb = *cb_info->cb;
-        auto * hdr = const_cast<headerToken_s *>(static_cast<const headerToken_s *>(hd));
-        const auto * item = static_cast<const TransactionItem *>(pkg_key);
-        if (!item && hdr) {
-            auto iter = transaction->items.find(headerGetInstance(hdr));
-            if (iter != transaction->items.end()) {
-                item = iter->second;
-            }
-        }
+        auto * trans_element = static_cast<rpmte>(const_cast<void *>(te));
+        auto * hdr = trans_element ? rpmteHeader(trans_element) : nullptr;
+        auto * item = trans_element ? static_cast<TransactionItem *>(rpmteUserdata(trans_element)) : nullptr;
+        /*printf("========= User data %s ==========\n", item ? item->get_pkg().get_full_nevra().c_str() : nullptr);
+        printf("========= Element %s ==========\n\n\n\n\n\n", rpmteNEVRA(trans_element));*/
 
         switch (what) {
             case RPMCALLBACK_INST_PROGRESS:
@@ -536,7 +646,7 @@ private:
             case RPMCALLBACK_INST_OPEN_FILE: {
                 auto file_path = item->get_pkg().get_package_path();
                 if (file_path.empty()) {
-                    return nullptr;
+                    break;
                 }
                 transaction->fd_in_cb = Fopen(file_path.c_str(), "r.ufdio");
                 rc = transaction->fd_in_cb;
@@ -628,6 +738,8 @@ private:
                 log.warning("Unknown RPM Transaction callback type: RPMCALLBACK_UNKNOWN");
         }
 
+        headerFree(hdr);
+
         return rc;
     }
 };
@@ -638,6 +750,7 @@ Transaction::Impl::Impl(const BaseWeakPtr & base, rpmVSFlags vsflags) : base(bas
     auto & config = base->get_config();
     set_root_dir(config.installroot().get_value().c_str());
     set_signature_verify_flags(vsflags);
+    rpmtsSetChangeCallback(ts, ts_change_callback, this);
 }
 
 Transaction::Impl::Impl(const BaseWeakPtr & base) : Impl(base, static_cast<rpmVSFlags>(rpmExpandNumeric("%{?__vsflags}"))) {}
@@ -669,9 +782,17 @@ void Transaction::Impl::install_up_down(TransactionItem & item, libdnf::transact
     }
     auto file_path = item.get_pkg().get_package_path();
     auto * header = read_pkg_header(file_path);
+    last_added_item = &item;
+    last_item_is_reinstall = false;
+    last_item_added_ts_element = false;
     auto rc = rpmtsAddInstallElement(ts, header, &item, upgrade ? 1 : 0, nullptr);
+    headerFree(header);
     if (rc != 0) {
         std::string msg = "Can't " + msg_action + " package \"" + file_path + "\"";
+        throw Exception(msg);
+    }
+    if (!last_item_added_ts_element) {
+        std::string msg = "librpm ignores explicit request to " + msg_action + " package \"" + file_path + "\"";
         throw Exception(msg);
     }
 }
