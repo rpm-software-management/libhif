@@ -21,6 +21,8 @@ along with libdnf.  If not, see <https://www.gnu.org/licenses/>.
 #include "repo_fixture.hpp"
 
 #include "libdnf/rpm/package_query.hpp"
+#include "libdnf/utils/string.hpp"
+#include "libdnf/rpm/nevra.hpp"
 
 #include "utils.hpp"
 
@@ -99,6 +101,30 @@ libdnf::rpm::Package RepoFixture::get_pkg(const std::string & nevra, const char 
     query.filter_nevra({nevra});
     query.filter_repoid({repo});
     return first_query_pkg(query, nevra + " (repo: " + repo + ")");
+}
+
+
+libdnf::rpm::Package RepoFixture::add_system_pkg(
+    const std::string & relative_path,
+    libdnf::transaction::TransactionItemReason reason)
+{
+    if (reason != libdnf::transaction::TransactionItemReason::UNKNOWN) {
+        // parse out the NA from the package path to set the reason for the installed package
+        auto filename_toks = libdnf::utils::string::split(relative_path, "/");
+        auto basename_toks = libdnf::utils::string::rsplit(filename_toks.back(), ".", 2);
+        auto nevras = libdnf::rpm::Nevra::parse(basename_toks.front());
+        CPPUNIT_ASSERT_MESSAGE("Couldn't parse NEVRA from package path: \"" + relative_path + "\"", !nevras.empty());
+        auto na = nevras[0].get_name() + "." + nevras[0].get_arch();
+
+        sack->get_system_state().set_reason(na, reason);
+    }
+
+    return sack->add_system_package(PROJECT_BINARY_DIR "/test/data/" + relative_path, false, false);
+}
+
+
+libdnf::rpm::Package RepoFixture::add_cmdline_pkg(const std::string & relative_path) {
+    return sack->add_cmdline_package(PROJECT_BINARY_DIR "/test/data/" + relative_path, false);
 }
 
 

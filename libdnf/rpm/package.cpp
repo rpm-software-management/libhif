@@ -102,6 +102,10 @@ std::string Package::get_full_nevra() const {
     return cstring2string(solv::get_full_nevra(pool, id.id));
 }
 
+std::string Package::get_na() const {
+    return get_name() + "." + get_arch();
+}
+
 std::string Package::get_group() const {
     Pool * pool = sack->p_impl->pool;
     return cstring2string(solv::get_group(pool, id.id));
@@ -293,6 +297,15 @@ libdnf::repo::RepoWeakPtr Package::get_repo() const {
 std::string Package::get_repo_id() const {
     Pool * pool = sack->p_impl->pool;
     return solv::get_repo(pool, id.id)->get_id();
+}
+
+libdnf::transaction::TransactionItemReason Package::get_reason() const {
+    if (!is_installed()) {
+        // TODO(lukash) Right now this breaks getting reasons in Transaction::Impl::set_transaction
+        //throw LogicError("Package " + get_nevra() + " is not installed.");
+    }
+
+    return sack->get_system_state().get_reason(get_na());
 }
 
 Checksum Package::get_checksum() const {

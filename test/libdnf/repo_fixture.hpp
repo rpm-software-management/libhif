@@ -47,6 +47,11 @@ protected:
         return get_pkg(nevra, repo.c_str());
     }
 
+    libdnf::rpm::Package add_system_pkg(
+        const std::string & relative_path,
+        libdnf::transaction::TransactionItemReason reason = libdnf::transaction::TransactionItemReason::UNKNOWN);
+    libdnf::rpm::Package add_cmdline_pkg(const std::string & relative_path);
+
     std::unique_ptr<libdnf::Base> base;
     libdnf::repo::RepoSackWeakPtr repo_sack;
     libdnf::rpm::PackageSackWeakPtr sack;
