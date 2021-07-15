@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2021 Red Hat, Inc.
+Copyright (C) 2020-2021 Red Hat, Inc.
 
 This file is part of libdnf: https://github.com/rpm-software-management/libdnf/
 
@@ -17,21 +17,16 @@ You should have received a copy of the GNU Lesser General Public License
 along with libdnf.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef LIBDNF_COMMON_PROC_HPP
-#define LIBDNF_COMMON_PROC_HPP
+#ifndef LIBDNF_BASE_BASE_WEAK_HPP
+#define LIBDNF_BASE_BASE_WEAK_HPP
 
-#include <sys/types.h>
+#include "libdnf/common/weak_ptr.hpp"
 
 
 namespace libdnf {
 
-constexpr uid_t INVALID_UID = static_cast<uid_t>(-1);
-
-/// Read the process owner login uid from the "/proc/<pid>/loginuid".
-/// @param pid process id
-/// @return libdnf::INVALID_UID if fails, login uid otherwise
-/// @since 5.0
-uid_t read_login_uid_from_proc(pid_t pid) noexcept;
+class Base;
+using BaseWeakPtr = WeakPtr<Base, false>;
 
 }  // namespace libdnf
 

@@ -17,29 +17,20 @@ You should have received a copy of the GNU Lesser General Public License
 along with libdnf.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-
 #ifndef LIBDNF_TRANSACTION_QUERY_HPP
 #define LIBDNF_TRANSACTION_QUERY_HPP
 
-
 #include "transaction.hpp"
 
+#include "libdnf/base/base_weak.hpp"
 #include "libdnf/common/sack/query.hpp"
 #include "libdnf/common/weak_ptr.hpp"
 
 #include <mutex>
 #include <vector>
 
-namespace libdnf {
-
-class Base;
-using BaseWeakPtr = WeakPtr<Base, false>;
-
-}  // namespace libdnf
-
 
 namespace libdnf::transaction {
-
 
 class TransactionSack;
 
@@ -55,8 +46,8 @@ public:
 
     // create an *empty* query
     // the content is lazily loaded/cached while running the queries
-    explicit TransactionQuery(const BaseWeakPtr & base);
-    explicit TransactionQuery(Base & base);
+    explicit TransactionQuery(const libdnf::BaseWeakPtr & base);
+    explicit TransactionQuery(libdnf::Base & base);
 
     /// @replaces libdnf:transaction/Transaction.hpp:method:Transaction.dbSelect(int64_t transaction_id)
     TransactionQuery & filter_id(int64_t pattern, sack::QueryCmp cmp = libdnf::sack::QueryCmp::EQ);
@@ -77,8 +68,6 @@ private:
     };
 };
 
-
 }  // namespace libdnf::transaction
-
 
 #endif  // LIBDNF_TRANSACTION_QUERY_HPP

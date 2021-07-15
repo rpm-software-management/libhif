@@ -17,22 +17,15 @@ You should have received a copy of the GNU Lesser General Public License
 along with libdnf.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-
 #ifndef LIBDNF_COMPS_GROUP_QUERY_HPP
 #define LIBDNF_COMPS_GROUP_QUERY_HPP
 
+#include "libdnf/base/base_weak.hpp"
 #include "libdnf/common/sack/query.hpp"
 #include "libdnf/common/weak_ptr.hpp"
 #include "libdnf/comps/group/group.hpp"
 
 #include <memory>
-
-namespace libdnf {
-
-class Base;
-using BaseWeakPtr = WeakPtr<Base, false>;
-
-}  // namespace libdnf
 
 
 namespace libdnf::comps {
@@ -49,8 +42,8 @@ class GroupQuery : public libdnf::sack::Query<Group> {
 public:
     // Create new query with newly composed groups (using only solvables from currently enabled repositories)
     explicit GroupQuery(const GroupSackWeakPtr & sack);
-    explicit GroupQuery(const BaseWeakPtr & base);
-    explicit GroupQuery(Base & base);
+    explicit GroupQuery(const libdnf::BaseWeakPtr & base);
+    explicit GroupQuery(libdnf::Base & base);
 
     GroupQuery(const GroupQuery & query);
     ~GroupQuery();
@@ -130,7 +123,6 @@ inline GroupQuery & GroupQuery::filter_installed(bool value) {
     filter(F::is_installed, value, sack::QueryCmp::EQ);
     return *this;
 }
-
 
 }  // namespace libdnf::comps
 

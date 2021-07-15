@@ -25,15 +25,10 @@ along with libdnf.  If not, see <https://www.gnu.org/licenses/>.
 #include "libdnf/advisory/advisory_package.hpp"
 #include "libdnf/advisory/advisory_reference.hpp"
 #include "libdnf/advisory/advisory_sack.hpp"
+#include "libdnf/base/base_weak.hpp"
 #include "libdnf/common/sack/query_cmp.hpp"
 #include "libdnf/rpm/package.hpp"
 
-namespace libdnf {
-
-class Base;
-using BaseWeakPtr = WeakPtr<Base, false>;
-
-}  // namespace libdnf
 
 namespace libdnf::advisory {
 
@@ -110,7 +105,6 @@ private:
     class Impl;
     std::unique_ptr<Impl> p_impl;
 };
-
 
 }  // namespace libdnf::advisory
 

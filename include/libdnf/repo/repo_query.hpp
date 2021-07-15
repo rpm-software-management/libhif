@@ -17,11 +17,10 @@ You should have received a copy of the GNU Lesser General Public License
 along with libdnf.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-
 #ifndef LIBDNF_REPO_REPO_QUERY_HPP
 #define LIBDNF_REPO_REPO_QUERY_HPP
 
-
+#include "libdnf/base/base_weak.hpp"
 #include "libdnf/common/sack/query.hpp"
 #include "libdnf/common/sack/query_cmp.hpp"
 #include "libdnf/common/weak_ptr.hpp"
@@ -31,19 +30,15 @@ along with libdnf.  If not, see <https://www.gnu.org/licenses/>.
 #include <vector>
 
 
-namespace libdnf {
-class Base;
-using BaseWeakPtr = WeakPtr<Base, false>;
-}
-
 namespace libdnf::repo {
+
 class RepoSack;
 using RepoSackWeakPtr = WeakPtr<RepoSack, false>;
+
 }
 
 
 namespace libdnf::repo {
-
 
 /// Weak pointer to rpm repository. RepoWeakPtr does not own the repository (ptr_owner = false).
 /// Repositories are owned by RepoSack.
@@ -59,16 +54,16 @@ public:
     /// Create a new RepoQuery instance.
     ///
     /// @param base     A weak pointer to Base
-    explicit RepoQuery(const BaseWeakPtr & base);
+    explicit RepoQuery(const libdnf::BaseWeakPtr & base);
 
     /// Create a new RepoQuery instance.
     ///
     /// @param base     Reference to Base
-    explicit RepoQuery(Base & base);
+    explicit RepoQuery(libdnf::Base & base);
 
     /// @return Weak pointer to the Base object.
     /// @since 5.0
-    BaseWeakPtr get_base() { return base; }
+    libdnf::BaseWeakPtr get_base() { return base; }
 
     /// Filter repos by their `enabled` state.
     ///
@@ -120,8 +115,6 @@ private:
     BaseWeakPtr base;
 };
 
-
 }  // namespace libdnf::repo
-
 
 #endif  // LIBDNF_REPO_REPO_QUERY_HPP

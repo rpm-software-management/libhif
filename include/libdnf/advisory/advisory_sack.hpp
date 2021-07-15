@@ -22,18 +22,16 @@ along with libdnf.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "advisory_query.hpp"
 
+#include "libdnf/base/base_weak.hpp"
 #include "libdnf/common/weak_ptr.hpp"
 #include "libdnf/solv/solv_map.hpp"
 
-namespace libdnf {
-class Base;
-using BaseWeakPtr = WeakPtr<Base, false>;
-}
 
 namespace libdnf::advisory {
 
 class AsdvisorySack;
 using AdvisorySackWeakPtr = WeakPtr<AdvisorySack, false>;
+
 
 class AdvisorySack {
 public:
@@ -44,7 +42,7 @@ public:
 
     /// @return The `Base` object to which this object belongs.
     /// @since 5.0
-    BaseWeakPtr get_base() const;
+    libdnf::BaseWeakPtr get_base() const;
 
 private:
     friend AdvisoryQuery;
