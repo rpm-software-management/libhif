@@ -32,11 +32,11 @@ public:
     void dbus_deregister();
 
 private:
-    sdbus::MethodReply list(sdbus::MethodCall && call);
-    sdbus::MethodReply install(sdbus::MethodCall && call);
-    sdbus::MethodReply upgrade(sdbus::MethodCall && call);
-    sdbus::MethodReply remove(sdbus::MethodCall && call);
-    sdbus::MethodReply downgrade(sdbus::MethodCall && call);
+    sdbus::MethodReply list(sdbus::MethodCall & call);
+    sdbus::MethodReply install(sdbus::MethodCall & call);
+    sdbus::MethodReply upgrade(sdbus::MethodCall & call);
+    sdbus::MethodReply remove(sdbus::MethodCall & call);
+    sdbus::MethodReply downgrade(sdbus::MethodCall & call);
 };
 
 #endif
